@@ -111,6 +111,21 @@ def _get_default_value(param: Parameter) -> str:
     )
 
 # %% ../nbs/096_Docusaurus_Helper.ipynb 23
+def _skip_self(sig: Signature, symbol: Type) -> Signature:
+    parameters = dict(_signature.parameters)
+    params_list = list(parameters.keys())
+
+    if (
+        isfunction(symbol)
+        and "." in symbol.__qualname__
+        and (len(params_list) > 0 and params_list[0] == "self")
+    ):
+        del parameters["self"]
+        sig = sig.replace(parameters=parameters.values())
+
+    return sig
+
+# %% ../nbs/096_Docusaurus_Helper.ipynb 27
 def _get_params_annotation(s: Signature) -> Dict[str, Dict[str, str]]:
     """Get the annotations along with its default values for the parameters of the symbol.
 
@@ -128,7 +143,7 @@ def _get_params_annotation(s: Signature) -> Dict[str, Dict[str, str]]:
         for param in s.parameters.values()
     }
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 25
+# %% ../nbs/096_Docusaurus_Helper.ipynb 29
 def _generate_parameters_table(
     symbol_annotations: Dict[str, Union[Dict[str, str], str]],
     section_items: Union[List[DocstringParam]],
@@ -144,23 +159,29 @@ def _generate_parameters_table(
     Returns:
         The parameters of a symbol in markdown-formatted string
     """
+    if len(symbol_annotations["parameters"]) == 0:
+        return ""
+
     nl = "\n"
     _section_template = (
         "|  Name | Type | Description | Default |\n|---|---|---|---|\n{section_body}\n"
     )
+    param_description = {
+        section.arg_name: section.description.replace(nl, "")
+        for section in section_items
+    }
     section_body = "".join(
         [
-            f'| `{section.arg_name}` | {symbol_annotations["parameters"][section.arg_name]["type"]} | {section.description.replace(nl, "")} | {symbol_annotations["parameters"][section.arg_name]["default"]} |\n'  # type: ignore
-            if section.arg_name in symbol_annotations["parameters"]
-            else ""
-            for section in section_items
+            f'| `{key}` | {value["type"]} | {param_description.get(key, "")} | {value["default"]} |\n'  # type: ignore
+            for key, value in symbol_annotations["parameters"].items()
         ]
     )
+
     return f"**{section_name}**:\n\n" + _section_template.format(
         section_body=section_body,
     )
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 27
+# %% ../nbs/096_Docusaurus_Helper.ipynb 33
 def _generate_return_and_raises_table(
     symbol_annotations: Dict[str, Union[Dict[str, str], str]],
     section_items: Union[List[DocstringReturns], List[DocstringRaises]],
@@ -178,17 +199,26 @@ def _generate_return_and_raises_table(
     """
     nl = "\n"
     _section_template = "|  Type | Description |\n|---|---|\n{section_body}\n"
-    section_body = "".join(
-        [
-            f'| `{symbol_annotations["return"] if section_name == "Returns" else section.type_name}` | {section.description.replace(nl, "")} |\n'  # type: ignore
-            for section in section_items
-        ]
-    )
+
+    if section_name == "Returns":
+        if symbol_annotations["return"] == "":
+            return ""
+        section_body = f'| `{symbol_annotations["return"]}` | {section_items[0].description.replace(nl, "") if len(section_items) > 0 else ""} |\n'
+
+    else:
+        if len(section_items) == 0:
+            return ""
+        section_body = "".join(
+            [
+                f'| `{section.type_name}` | {section.description.replace(nl, "")} |\n'  # type: ignore
+                for section in section_items
+            ]
+        )
     return f"**{section_name}**:\n\n" + _section_template.format(
         section_body=section_body,
     )
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 30
+# %% ../nbs/096_Docusaurus_Helper.ipynb 39
 def _format_docstring_section_items(
     symbol_annotations: Dict[str, Union[Dict[str, str], str]],
     section_items: Union[
@@ -211,7 +241,7 @@ def _format_docstring_section_items(
     else:
         return _generate_return_and_raises_table(symbol_annotations, section_items, section_name)  # type: ignore
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 35
+# %% ../nbs/096_Docusaurus_Helper.ipynb 44
 def _get_annotation(symbol: Type) -> Dict[str, Union[Dict[str, Dict[str, str]], str]]:
     """Get annotations along with its default value for a symbol
 
@@ -227,7 +257,7 @@ def _get_annotation(symbol: Type) -> Dict[str, Union[Dict[str, Dict[str, str]], 
     return_annotation = _get_return_annotation(symbol_signature)
     return {"parameters": params_dict, "return": return_annotation}
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 38
+# %% ../nbs/096_Docusaurus_Helper.ipynb 49
 def _format_docstring_sections(symbol: Type, parsed_docstring: Docstring) -> str:
     """Format the parsed docstring sections into markdown-formatted table
 
@@ -247,14 +277,13 @@ def _format_docstring_sections(symbol: Type, parsed_docstring: Docstring) -> str
     ]
 
     for section_name, section_items in sections:
-        if len(section_items) > 0:  # type: ignore
-            formatted_docstring += _format_docstring_section_items(
-                symbol_annotations, section_items, section_name  # type: ignore
-            )
+        formatted_docstring += _format_docstring_section_items(
+            symbol_annotations, section_items, section_name  # type: ignore
+        )
 
     return formatted_docstring
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 40
+# %% ../nbs/096_Docusaurus_Helper.ipynb 51
 def _format_free_links(s: str) -> str:
     """Format free links in a given string by adding proper spacing around them.
 
@@ -270,7 +299,7 @@ def _format_free_links(s: str) -> str:
     )
     return ret_val
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 42
+# %% ../nbs/096_Docusaurus_Helper.ipynb 53
 def _docstring_to_markdown(symbol: Type) -> str:
     """Converts a docstring to a markdown-formatted string.
 
@@ -280,22 +309,24 @@ def _docstring_to_markdown(symbol: Type) -> str:
     Returns:
         The markdown-formatted docstring.
     """
-    if symbol.__doc__ is None:
-        return ""
-
     parsed_docstring = parse(symbol.__doc__)
-    formatted_docstring = f"{parsed_docstring.short_description}\n\n"
-    formatted_docstring += (
+    short_desc = (
+        f"{parsed_docstring.short_description}\n\n"
+        if parsed_docstring.short_description
+        else ""
+    )
+    long_desc = (
         f"{parsed_docstring.long_description}\n\n"
         if parsed_docstring.long_description
         else ""
     )
-    formatted_docstring += _format_docstring_sections(symbol, parsed_docstring)
+    docstring_sections = _format_docstring_sections(symbol, parsed_docstring)
+    formatted_docstring = short_desc + long_desc + docstring_sections
     ret_val = _format_free_links(formatted_docstring)
 
     return ret_val
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 47
+# %% ../nbs/096_Docusaurus_Helper.ipynb 60
 def _get_submodules(module_name: str) -> List[str]:
     """Get a list of all submodules contained within the module.
 
@@ -312,7 +343,7 @@ def _get_submodules(module_name: str) -> List[str]:
     ]
     return members_with_submodules_str
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 49
+# %% ../nbs/096_Docusaurus_Helper.ipynb 62
 def _load_submodules(
     module_name: str, members_with_submodules: List[str]
 ) -> List[Type]:
@@ -336,7 +367,7 @@ def _load_submodules(
     ]
     return names
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 51
+# %% ../nbs/096_Docusaurus_Helper.ipynb 64
 def _get_parameters(_signature: Signature) -> List[str]:
     """Convert a function's signature into a string representation of its parameter list.
 
@@ -357,7 +388,7 @@ def _get_parameters(_signature: Signature) -> List[str]:
     ]
     return ret_val
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 55
+# %% ../nbs/096_Docusaurus_Helper.ipynb 68
 def _format_symbol_definition(symbol: Type, params_list: List[str]) -> str:
     """Format the given symbol parameters by adding a new line and indentation.
 
@@ -368,6 +399,7 @@ def _format_symbol_definition(symbol: Type, params_list: List[str]) -> str:
     Returns:
         A formatted string representation of the parameters with new lines and indentation.
     """
+    params_list = _skip_self(symbol, params_list)
     parameters = ", ".join(params_list)
     if parameters == "":
         return f"{symbol.__name__}()\n"
@@ -377,7 +409,7 @@ def _format_symbol_definition(symbol: Type, params_list: List[str]) -> str:
         formatted_parameters = "".join([f"\n    {param}," for param in params_list])
         return f"{symbol.__name__}({formatted_parameters}\n)\n"
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 62
+# %% ../nbs/096_Docusaurus_Helper.ipynb 77
 def _get_exps(mod: str) -> Dict[str, str]:
     mf = _find_mod(mod)
     if not mf:
@@ -399,7 +431,7 @@ def _get_exps(mod: str) -> Dict[str, str]:
             )
     return d
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 64
+# %% ../nbs/096_Docusaurus_Helper.ipynb 79
 def _lineno(sym: str, fname: str) -> Optional[str]:
     return _get_exps(fname).get(sym, None) if fname else None
 
@@ -423,7 +455,7 @@ class CustomNbdevLookup(NbdevLookup.__wrapped__):  # type: ignore
         line = _lineno(sym, py)
         return f"{gh}#L{line}"
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 67
+# %% ../nbs/096_Docusaurus_Helper.ipynb 82
 def _get_symbol_source_link(symbol: Type, lib_version: str) -> str:
     """Returns the source code link for a given symbol.
 
@@ -447,7 +479,7 @@ def _get_symbol_source_link(symbol: Type, lib_version: str) -> str:
     )
     return f'<a href="{href}" class="link-to-source" target="_blank">View source</a>'
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 71
+# %% ../nbs/096_Docusaurus_Helper.ipynb 86
 def _get_method_type(symbol: Type) -> str:
     try:
         source = getsource(symbol).strip()
@@ -492,7 +524,7 @@ def _get_symbol_definition(symbol: Type, header_level: int, lib_version: str) ->
     symbol_definition = f"```py\n{_get_method_type(symbol)}{_format_symbol_definition(symbol, parameters)}```\n"
     return symbol_anchor + link_to_source + symbol_definition
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 77
+# %% ../nbs/096_Docusaurus_Helper.ipynb 92
 def _is_method(symbol: Type) -> bool:
     """Check if the given symbol is a method.
 
@@ -504,7 +536,7 @@ def _is_method(symbol: Type) -> bool:
     """
     return ismethod(symbol) or isfunction(symbol) or isinstance(symbol, property)
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 79
+# %% ../nbs/096_Docusaurus_Helper.ipynb 94
 def _get_formatted_docstring_for_symbol(
     symbol: Type, lib_version: str, header_level: int = 2
 ) -> str:
@@ -549,7 +581,7 @@ def _get_formatted_docstring_for_symbol(
         contents = traverse(symbol, contents, header_level + 1, lib_version)
     return contents
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 84
+# %% ../nbs/096_Docusaurus_Helper.ipynb 99
 def _convert_html_style_attribute_to_jsx(contents: str) -> str:
     """Converts the inline style attributes in an HTML string to JSX compatible format.
 
@@ -581,7 +613,7 @@ def _convert_html_style_attribute_to_jsx(contents: str) -> str:
 
     return contents
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 86
+# %% ../nbs/096_Docusaurus_Helper.ipynb 101
 def _get_all_markdown_files_path(docs_path: Path) -> List[Path]:
     """Get all Markdown files in a directory and its subdirectories.
 
@@ -594,12 +626,12 @@ def _get_all_markdown_files_path(docs_path: Path) -> List[Path]:
     markdown_files = [file_path for file_path in docs_path.glob("**/*.md")]
     return markdown_files
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 88
+# %% ../nbs/096_Docusaurus_Helper.ipynb 103
 def _fix_special_symbols_in_html(contents: str) -> str:
     contents = contents.replace("”", '"')
     return contents
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 90
+# %% ../nbs/096_Docusaurus_Helper.ipynb 105
 def _add_file_extension_to_link(url: str) -> str:
     """Add file extension to the last segment of a URL
 
@@ -612,7 +644,7 @@ def _add_file_extension_to_link(url: str) -> str:
     segments = url.split("/#")[0].split("/")[-2:]
     return url.replace(f"/{segments[1]}", f"/{segments[1]}.md").replace(".md/#", ".md#")
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 94
+# %% ../nbs/096_Docusaurus_Helper.ipynb 109
 def _generate_production_url(url: str) -> str:
     """Generate a Docusaurus compatible production URL for the given symbol URL.
 
@@ -628,7 +660,7 @@ def _generate_production_url(url: str) -> str:
         return "/".join(url_split[:-1]) + hash_segment
     return url.replace(".md", "")
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 96
+# %% ../nbs/096_Docusaurus_Helper.ipynb 111
 def _fix_symbol_links(
     contents: str,
     dir_prefix: str,
@@ -665,7 +697,7 @@ def _fix_symbol_links(
         contents = contents.replace(old_url, updated_url)
     return contents
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 104
+# %% ../nbs/096_Docusaurus_Helper.ipynb 119
 def _get_relative_url_prefix(docs_path: Path, sub_path: Path) -> str:
     """Returns a relative url prefix from a sub path to a docs path.
 
@@ -688,7 +720,7 @@ def _get_relative_url_prefix(docs_path: Path, sub_path: Path) -> str:
         "../" * (len(relative_path.parts) - 1) if len(relative_path.parts) > 1 else ""
     )
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 106
+# %% ../nbs/096_Docusaurus_Helper.ipynb 121
 def fix_invalid_syntax_in_markdown(docs_path: str) -> None:
     """Fix invalid HTML syntax in markdown files and converts inline style attributes to JSX-compatible format.
 
@@ -711,7 +743,7 @@ def fix_invalid_syntax_in_markdown(docs_path: str) -> None:
         )
         file.write_text(contents)
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 108
+# %% ../nbs/096_Docusaurus_Helper.ipynb 123
 def generate_markdown_docs(module_name: str, docs_path: str) -> None:
     """Generates Markdown documentation files for the symbols in the given module and save them to the given directory.
 
@@ -731,7 +763,7 @@ def generate_markdown_docs(module_name: str, docs_path: str) -> None:
         with open((Path(docs_path) / "api" / target_file_path), "w") as f:
             f.write(content)
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 111
+# %% ../nbs/096_Docusaurus_Helper.ipynb 126
 def _parse_lines(lines: List[str]) -> Tuple[List[str], int]:
     """Parse a list of lines and return a tuple containing a list of filenames and an index indicating how many lines to skip.
 
@@ -748,7 +780,7 @@ def _parse_lines(lines: List[str]) -> Tuple[List[str], int]:
     )
     return [line.split("(")[1][:-4] for line in lines[:index]], index
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 114
+# %% ../nbs/096_Docusaurus_Helper.ipynb 129
 def _parse_section(text: str, ignore_first_line: bool = False) -> List[Any]:
     """Parse the given section contents and return a list of file names in the expected format.
 
@@ -777,7 +809,7 @@ def _parse_section(text: str, ignore_first_line: bool = False) -> List[Any]:
             index += 1
     return ret_val
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 117
+# %% ../nbs/096_Docusaurus_Helper.ipynb 132
 def _get_section_from_markdown(
     markdown_text: str, section_header: str
 ) -> Optional[str]:
@@ -795,7 +827,7 @@ def _get_section_from_markdown(
     match = pattern.search(markdown_text)
     return match.group(1) if match else None
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 122
+# %% ../nbs/096_Docusaurus_Helper.ipynb 137
 def generate_sidebar(
     summary_file: str = "./docusaurus/docs/SUMMARY.md",
     summary: str = "",
@@ -851,7 +883,7 @@ tutorialSidebar: [
 };"""
         )
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 124
+# %% ../nbs/096_Docusaurus_Helper.ipynb 139
 def _get_markdown_filenames_from_sidebar(sidebar_file_path: str) -> List[str]:
     """Get a list of Markdown filenames included in the sidebar.
 
@@ -872,7 +904,7 @@ def _get_markdown_filenames_from_sidebar(sidebar_file_path: str) -> List[str]:
         ]
         return markdown_filenames
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 126
+# %% ../nbs/096_Docusaurus_Helper.ipynb 141
 def _delete_files(files: List[Path]) -> None:
     """Deletes a list of files.
 
@@ -891,7 +923,7 @@ def _delete_files(files: List[Path]) -> None:
                 f"Error deleting files from docusaurus/docs directory. Could not delete file: {file} - {e}"
             )
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 129
+# %% ../nbs/096_Docusaurus_Helper.ipynb 144
 def delete_unused_markdown_files_from_sidebar(
     docs_path: str, sidebar_file_path: str
 ) -> None:
@@ -914,7 +946,7 @@ def delete_unused_markdown_files_from_sidebar(
         )
         _delete_files(md_files_to_delete)
 
-# %% ../nbs/096_Docusaurus_Helper.ipynb 131
+# %% ../nbs/096_Docusaurus_Helper.ipynb 146
 def update_readme() -> None:
     """Update the readme file and fix the symbol links"""
     cfg = get_config()
