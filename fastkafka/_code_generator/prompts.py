@@ -383,65 +383,8 @@ Strictly follow the below steps while generating the Python script
 We are implementing a FastKafka app (check above for description).
 
 This app has the following Message classes:
-- User
 
-Let's now implement the Employee message class with the following arguments:
-
-Argument: name, Type: str
-
-Now, lets create a instance of the FastKafka app with the following fields and assign it to the variable named "producer_app":
-
-kafka_brokers: None
-title: Producer Kafka app
-
-
-Now lets write the following @producer_app.produces functions with the following details:
-
-- write a produces function named "to_first" which should produce messages to the "first" topic and set the prefix parameter to "to".
-- The function should take the following parameters:
-  - Parameter: user, Type: User
-- The function should implement the following business logic:
-  - This function creates a User object and sends it to the 'first' Kafka topic. The function accepts a User object as input. It then returns the same User object which gets automatically sent to the 'first' topic by the FastKafka framework
-- After implementing the above logic, the function should return the User object.
-
-
-Now lets write the following @producer_app.produces functions with the following details:
-
-- write a produces function named "to_second" which should produce messages to the "second" topic and set the prefix parameter to "to".
-- The function should take the following parameters:
-  - Parameter: user, Type: User
-- The function should implement the following business logic:
-  - This function creates a User object and sends it to the 'second' Kafka topic. The function accepts a User object as input. It then returns the same User object which gets automatically sent to the 'second' topic by the FastKafka framework.
-- After implementing the above logic, the function should return the User object.
-
-
-=====
-
-Now, lets create a instance of the FastKafka app with the following fields and assign it to the variable named "consumer_app":
-
-kafka_brokers: None
-title: Consumer Kafka app
-
-
-Now lets write the following @consumer_app.consumes functions with the following details:
-
-- write a consume function named "on_first" which should consume messages from the "first" topic and set the prefix parameter to "on".
-- The function should take the following parameters:
-  - Parameter: msg, Type: User
-- The function should implement the following business logic:
-  - This function consumes a User object from the 'first' Kafka topic. The function accepts a User object as input. It then simply prints the name attribute of the User object to the console.  
-
-
-Now lets write the following @consumer_app.consumes functions with the following details:
-
-- write a consume function named "on_second" which should consume messages from the "second" topic and set the prefix parameter to "on".
-- The function should take the following parameters:
-  - Parameter: msg, Type: User
-- The function should implement the following business logic:
-  - This function consumes a User object from the 'second' Kafka topic. The function accepts a User object as input. It then simply prints the name attribute of the User object to the console.
-
-
-
+{generated_plan_prompt}
 
 ==== Additional strong guidelines for you to follow: ==== 
 
@@ -457,7 +400,7 @@ Now lets write the following @consumer_app.consumes functions with the following
 Please refer to the below ==== APP DESCRIPTION: ==== for additional implementation details: 
 
 ==== APP DESCRIPTION: ====
-Generate two fastkafka apps, the first fastkafka apps should contain two produces functions. It should send a User object with name attribute to "first" and "second" topic. The second fastkafka app should consume the data from the topics "first" and "second" and print in.
+{validated_description}
 """
 
 # %% ../../nbs/032_Code_Generation_Prompts.ipynb 6

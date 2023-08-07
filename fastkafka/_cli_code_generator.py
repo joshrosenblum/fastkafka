@@ -78,7 +78,7 @@ def generate_fastkafka_app(
         _ensure_openai_api_key_set()
         validated_description, description_token = validate_app_description(description)
         validated_plan, plan_token = generate_plan(validated_description)
-        code = generate_app(validated_plan)
+        code = generate_app(validated_plan, validated_description)
         test = generate_test(code)
 
         total_token_usage = description_token + plan_token
