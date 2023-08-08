@@ -399,8 +399,6 @@ This app has the following Message classes:
 
 Please refer to the below ==== APP DESCRIPTION: ==== for additional implementation details: 
 
-==== APP DESCRIPTION: ====
-{validated_description}
 """
 
 # %% ../../nbs/032_Code_Generation_Prompts.ipynb 6

@@ -14,6 +14,7 @@ from ._code_generator.app_description_validator import validate_app_description
 from ._code_generator.plan_generator import generate_plan
 from ._code_generator.app_generator import generate_app
 from ._code_generator.test_generator import generate_test
+from ._code_generator.helper import set_logger_level
 
 # %% ../nbs/026_CLI_Code_Generator.ipynb 3
 logger = get_logger(__name__)
@@ -55,6 +56,7 @@ Note: Accessing OpenAI API incurs charges. However, when you sign up for the fir
     "generate",
     help="Generate a new FastKafka app(s) effortlessly with advanced AI assistance",
 )
+@set_logger_level
 def generate_fastkafka_app(
     description: str = typer.Argument(
         ...,
@@ -71,7 +73,13 @@ def generate_fastkafka_app(
 
 
 \n""",
-    )
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        "-d",
+        help="Enable verbose logging by setting the logger level to DEBUG.",
+    ),
 ) -> None:
     """Generate a new FastKafka app(s) effortlessly with advanced AI assistance"""
     try:
